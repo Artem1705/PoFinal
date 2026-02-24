@@ -1,0 +1,44 @@
+[
+    {
+        "date": "2026-02-24 05:07",
+        "from": "USD",
+        "to": "EUR",
+        "amount": 134.0,
+        "result": 113.64
+    },
+    {
+        "date": "2026-02-24 05:07",
+        "from": "RUB",
+        "to": "USD",
+        "amount": 134.0,
+        "result": 1.74
+    },
+    {
+        "date": "2026-02-24 05:09",
+        "from": "USD",
+        "to": "EUR",
+        "amount": 213123.0,
+        "result": 180738.11
+    },
+    {
+        "date": "2026-02-24 05:09",
+        "from": "RUB",
+        "to": "USD",
+        "amount": 213123.0,
+        "result": 2772.3
+    },
+    {
+        "date": "2026-02-24 07:48",
+        "from": "RUB",
+        "to": "USD",
+        "amount": 1767.0,
+        "result": 22.99
+    },
+    {
+        "date": "2026-02-24 10:50",
+        "from": "RUB",
+        "to": "USD",
+        "amount": 1000.0,
+        "result": 13.01
+    }
+]
