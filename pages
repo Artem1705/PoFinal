@@ -1,0 +1,270 @@
+import tkinter as tk
+from tkinter import messagebox
+from func import get_rates, convert, load_history, load_favorites, save_favorites
+import matplotlib.pyplot as plt
+from func import get_history
+
+BG_COLOR = "#121212"
+TEXT_COLOR = "white"
+CARD_COLOR = "#1E1E1E"
+BTN_COLOR = "#2A2A2A"
+
+ALL_CURRENCIES = ["USD", "EUR", "RUB", "GBP", "JPY", "CNY", "AUD", "CAD", "CHF"]
+
+
+def create_pages(container):
+
+    frames = {}
+
+    converter_from = tk.StringVar()
+    converter_to = tk.StringVar()
+
+    # =====================================
+    # 1️⃣ ВАЛЮТЫ
+    # =====================================
+    currencies_page = tk.Frame(container, bg=BG_COLOR)
+
+    title = tk.Label(currencies_page, text="Курс валют (USD)",
+                     bg=BG_COLOR, fg=TEXT_COLOR,
+                     font=("Arial", 26))
+    title.pack(pady=20)
+
+    rates_frame = tk.Frame(currencies_page, bg=BG_COLOR)
+    rates_frame.pack()
+
+    def show_graph(currency, base_currency):
+
+        history = get_history(base_currency, currency, days=30)
+
+        if not history:
+            messagebox.showerror("Ошибка", "Не удалось загрузить график")
+            return
+
+        dates = [item[0] for item in history]
+        values = [item[1] for item in history]
+
+        plt.figure(figsize=(8, 4))
+        plt.plot(dates, values)
+        plt.xticks(rotation=45)
+        plt.title(f"{currency} к {base_currency} (30 дней)")
+        plt.tight_layout()
+        plt.show()
+
+    def load_rates():
+        for w in rates_frame.winfo_children():
+            w.destroy()
+        fav = load_favorites()
+        rates = get_rates(fav[0])
+        if not rates:
+            return
+
+        base_currency = fav[0] if fav else "USD"
+
+        for cur in ALL_CURRENCIES:
+            if cur == fav[0]:
+                continue
+
+            card = tk.Frame(rates_frame,
+                            bg=CARD_COLOR,
+                            width=520,
+                            height=55)
+            card.pack(pady=6)
+            card.pack_propagate(False)
+
+            # Валюта
+            tk.Label(card,
+                     text=cur,
+                     bg=CARD_COLOR,
+                     fg="white",
+                     font=("Arial", 16)).pack(side="left", padx=20)
+
+            # Курс
+            tk.Label(card,
+                     text=f"{rates[cur]}",
+                     bg=CARD_COLOR,
+                     fg="white",
+                     font=("Arial", 16)).pack(side="left", padx=40)
+
+            graph_btn = tk.Button(card,
+                                  text="📈",
+                                  bg=BTN_COLOR,
+                                  fg="white",
+                                  bd=0,
+                                  font=("Arial", 14),
+                                  command=lambda c=cur, b=base_currency: show_graph(c, b))
+            graph_btn.pack(side="right", padx=20)
+
+            # hover эффект для кнопки
+            graph_btn.bind("<Enter>",
+                           lambda e, btn=graph_btn: btn.config(bg="#3A3A3A"))
+            graph_btn.bind("<Leave>",
+                           lambda e, btn=graph_btn: btn.config(bg=BTN_COLOR))
+
+    currencies_page.place(relwidth=1, relheight=1)
+    frames["Валюты"] = currencies_page
+
+    # =====================================
+    # 2️⃣ КОНВЕРТЕР
+    # =====================================
+    converter_page = tk.Frame(container, bg=BG_COLOR)
+
+    tk.Label(converter_page, text="Конвертер",
+             bg=BG_COLOR, fg=TEXT_COLOR,
+             font=("Arial", 26)).pack(pady=20)
+
+    amount_entry = tk.Entry(converter_page,
+                            bg=CARD_COLOR,
+                            fg="white",
+                            insertbackground="white",
+                            relief="flat",
+                            font=("Arial", 16),
+                            width=20)
+    amount_entry.pack(pady=10)
+
+    from_menu = tk.OptionMenu(converter_page, converter_from, *ALL_CURRENCIES)
+    to_menu = tk.OptionMenu(converter_page, converter_to, *ALL_CURRENCIES)
+
+    for menu in (from_menu, to_menu):
+        menu.config(bg=CARD_COLOR, fg="white", relief="flat", width=15)
+
+    from_menu.pack(pady=5)
+    to_menu.pack(pady=5)
+
+    result_label = tk.Label(converter_page,
+                            text="",
+                            bg=BG_COLOR,
+                            fg="white",
+                            font=("Arial", 20))
+    result_label.pack(pady=10)
+
+    def do_convert():
+        try:
+            amount = float(amount_entry.get())
+        except:
+            messagebox.showerror("Ошибка", "Введите число")
+            return
+
+        result = convert(amount,
+                         converter_from.get(),
+                         converter_to.get())
+
+        if result:
+            result_label.config(
+                text=f"{amount} {converter_from.get()} = {result} {converter_to.get()}"
+            )
+
+    tk.Button(converter_page,
+              text="Конвертировать",
+              bg=BTN_COLOR,
+              fg="white",
+              bd=0,
+              font=("Arial", 14),
+              command=do_convert).pack(pady=10)
+
+    converter_page.place(relwidth=1, relheight=1)
+    frames["Конвертер"] = converter_page
+
+    # =====================================
+    # 3️⃣ ИЗБРАННОЕ (показывает курс)
+    # =====================================
+    fav_page = tk.Frame(container, bg=BG_COLOR)
+    fav_frame = tk.Frame(fav_page, bg=BG_COLOR)
+    fav_frame.pack(pady=40)
+
+    def refresh_fav():
+        for w in fav_frame.winfo_children():
+            w.destroy()
+
+        fav = load_favorites()
+        rates = get_rates("USD")
+
+        for cur in fav:
+            if rates and cur in rates:
+                tk.Label(fav_frame,
+                         text=f"1 USD = {rates[cur]} {cur}",
+                         bg=BG_COLOR,
+                         fg="white",
+                         font=("Arial", 18)).pack(pady=6)
+
+    fav_page.place(relwidth=1, relheight=1)
+    frames["Избранное"] = fav_page
+
+    # =====================================
+    # 4️⃣ ИСТОРИЯ
+    # =====================================
+    history_page = tk.Frame(container, bg=BG_COLOR)
+    history_frame = tk.Frame(history_page, bg=BG_COLOR)
+    history_frame.pack(pady=20)
+
+    def refresh_history():
+        for w in history_frame.winfo_children():
+            w.destroy()
+
+        for item in reversed(load_history()[-15:]):
+            tk.Label(history_frame,
+                     text=f"{item['date']}   {item['amount']} {item['from']} → {item['result']} {item['to']}",
+                     bg=BG_COLOR,
+                     fg="white",
+                     font=("Arial", 14)).pack(pady=4)
+
+    history_page.place(relwidth=1, relheight=1)
+    frames["История"] = history_page
+
+    # =====================================
+    # 5️⃣ НАСТРОЙКИ
+    # =====================================
+    settings_page = tk.Frame(container, bg=BG_COLOR)
+
+    tk.Label(settings_page, text="Выберите избранные валюты",
+             bg=BG_COLOR, fg="white",
+             font=("Arial", 22)).pack(pady=20)
+
+    vars_dict = {}
+    fav = load_favorites()
+
+    for cur in ALL_CURRENCIES:
+        var = tk.BooleanVar(value=cur in fav)
+        chk = tk.Checkbutton(settings_page,
+                             text=cur,
+                             variable=var,
+                             bg=BG_COLOR,
+                             fg="white",
+                             selectcolor=BG_COLOR,
+                             activebackground=BG_COLOR,
+                             font=("Arial", 14))
+        chk.pack(anchor="w", padx=200)
+        vars_dict[cur] = var
+
+    def save_settings():
+        selected = [c for c, v in vars_dict.items() if v.get()]
+        save_favorites(selected)
+        messagebox.showinfo("Сохранено", "Избранное обновлено")
+
+    tk.Button(settings_page,
+              text="Сохранить",
+              bg=BTN_COLOR,
+              fg="white",
+              bd=0,
+              font=("Arial", 14),
+              command=save_settings).pack(pady=20)
+
+    settings_page.place(relwidth=1, relheight=1)
+    frames["Настройки"] = settings_page
+
+    # ---------- Обновление ----------
+    def refresh_all():
+        load_rates()
+        refresh_fav()
+        refresh_history()
+
+        fav = load_favorites()
+        if fav:
+            converter_from.set(fav[0])
+        else:
+            converter_from.set("USD")
+
+        converter_to.set("USD")
+
+    refresh_all()
+
+    return frames, refresh_all
