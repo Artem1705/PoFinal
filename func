@@ -1,0 +1,114 @@
+import requests
+import json
+import os
+import threading
+import time
+from datetime import datetime
+import datetime as dt
+
+API_URL = "https://open.er-api.com/v6/latest/"
+HISTORY_FILE = "history.json"
+FAVORITES_FILE = "favorites.json"
+
+# ---------- КЭШ ----------
+rates_cache = {}
+last_update = 0
+CACHE_LIFETIME = 60  #секунд
+
+
+
+
+def get_rates(base="USD"):
+    global last_update
+
+    # если кэш свежий — возвращаем его
+    if base in rates_cache and time.time() - last_update < CACHE_LIFETIME:
+        return rates_cache[base]
+
+    try:
+        r = requests.get(API_URL + base, timeout=5)
+        data = r.json()
+
+        if data["result"] != "success":
+            return None
+
+        rates_cache[base] = data["rates"]
+        last_update = time.time()
+        return data["rates"]
+
+    except:
+        return None
+
+
+def convert(amount, from_currency, to_currency):
+    rates = get_rates(from_currency)
+
+    if not rates or to_currency not in rates:
+        return None
+
+    result = round(amount * rates[to_currency], 2)
+    save_history(amount, from_currency, to_currency, result)
+    return result
+
+
+def save_history(amount, from_c, to_c, result):
+    history = load_history()
+    history.append({
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "from": from_c,
+        "to": to_c,
+        "amount": amount,
+        "result": result
+    })
+    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(history, f, indent=4)
+
+
+def load_history():
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+# ---------- FAVORITES ----------
+def load_favorites():
+    if not os.path.exists(FAVORITES_FILE):
+        return []
+    with open(FAVORITES_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_favorites(fav_list):
+    with open(FAVORITES_FILE, "w", encoding="utf-8") as f:
+        json.dump(fav_list, f, indent=4)
+
+
+def get_history(base, target, days=30):
+    try:
+        end = dt.date.today() - dt.timedelta(days=1)
+        start = end - dt.timedelta(days=days)
+
+        url = (
+            f"https://api.frankfurter.app/"
+            f"{start}..{end}?from={base}&to={target}"
+        )
+
+        r = requests.get(url, timeout=5)
+        data = r.json()
+
+        if "rates" not in data or not data["rates"]:
+            return None
+
+        history = []
+
+        for date in sorted(data["rates"].keys()):
+            value = data["rates"][date].get(target)
+            if value:
+                history.append((date, value))
+
+        return history if history else None
+
+    except Exception as e:
+        print("History error:", e)
+        return None
